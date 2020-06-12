@@ -268,7 +268,7 @@ public class MySqlCreateTableParser extends SQLCreateTableParser {
                             }
                         }
                         accept(Token.RPAREN);
-                        
+
                         if (lexer.identifierEquals("USING")) {
                             lexer.nextToken();
                             idx.setIndexType(lexer.stringVal());
@@ -618,6 +618,16 @@ public class MySqlCreateTableParser extends SQLCreateTableParser {
         if (lexer.token() == (Token.AS)) {
             lexer.nextToken();
         }
+        if (lexer.token() == (Token.LPAREN)) {
+            lexer.nextToken();
+
+            if (lexer.token() == Token.SELECT) {
+                SQLSelect query = new MySqlSelectParser(this.exprParser).select();
+                stmt.setSelect(query);
+            } else throw new ParserException("TODO. " + lexer.info());
+
+            accept(Token.RPAREN);
+        }
 
         if (lexer.token() == (Token.SELECT)) {
             SQLSelect query = new MySqlSelectParser(this.exprParser).select();
@@ -905,7 +915,7 @@ public class MySqlCreateTableParser extends SQLCreateTableParser {
 
                 subPartitionByClause.getOptions().add(option);
             }
-            
+
             if (lexer.identifierEquals("SUBPARTITIONS")) {
                 lexer.nextToken();
                 Number intValue = lexer.integerValue();
