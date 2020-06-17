@@ -1147,6 +1147,10 @@ public class WallVisitorUtils {
             addViolation(visitor, ErrorCode.SAME_CONST_LIKE, "same const like", x);
         }
 
+        if (x.getOperator() == SQLBinaryOperator.Like && !visitor.getConfig().isConditionLikeTrueAllow() && Boolean.TRUE == rightResult) {
+            addViolation(visitor, ErrorCode.ALWAYS_TRUE, "condition like true not allow", x);
+        }
+
         if (x.getOperator() == SQLBinaryOperator.Like || x.getOperator() == SQLBinaryOperator.NotLike) {
             WallContext context = WallContext.current();
             if (context != null) {
