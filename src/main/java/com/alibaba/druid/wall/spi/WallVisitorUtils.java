@@ -288,6 +288,11 @@ public class WallVisitorUtils {
             return;
         }
 
+        if (!visitor.getConfig().isSelectIntoOutfileAllow() && x.getInto() != null) {
+            addViolation(visitor, ErrorCode.SELECT_INTO_NOT_ALLOW, "select into outfile not allow", x);
+            return;
+        }
+
         List<SQLCommentHint> hints = x.getHintsDirect();
         if (hints != null
                 && x.getParent() instanceof SQLUnionQuery
