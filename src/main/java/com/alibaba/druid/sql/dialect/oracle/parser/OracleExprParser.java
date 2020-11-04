@@ -1043,6 +1043,12 @@ public class OracleExprParser extends SQLExprParser {
                     interval.setToFactionalSecondsPrecision(primary());
                     accept(Token.RPAREN);
                 }
+            }else if(lexer.identifierEquals("MINUTE")){
+                interval.setToType(OracleIntervalType.MINUTE);
+                lexer.nextToken();
+            }else if(lexer.identifierEquals("HOUR")){
+                interval.setToType(OracleIntervalType.HOUR);
+                lexer.nextToken();
             } else {
                 interval.setToType(OracleIntervalType.MONTH);
                 lexer.nextToken();
