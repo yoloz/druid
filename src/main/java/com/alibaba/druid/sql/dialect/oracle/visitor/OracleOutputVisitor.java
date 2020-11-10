@@ -1632,7 +1632,7 @@ public class OracleOutputVisitor extends SQLASTOutputVisitor implements OracleAS
 
                 print0(ucase ? "RENAME " : "rename ");
                 x.getName().accept(this);
-                print0(ucase ? " TO " : "to ");
+                print0(ucase ? " TO " : " to ");
                 to.accept(this);
                 return false;
             }
