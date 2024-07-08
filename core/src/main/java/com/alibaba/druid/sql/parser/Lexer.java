@@ -2137,7 +2137,7 @@ public class Lexer {
         }
     }
 
-    protected final void scanAlias() {
+    protected void scanAlias() {
         final char quote = ch;
         {
             boolean hasSpecial = false;
