@@ -95,7 +95,9 @@ public enum DbType {
     pointbase(0),
     edbc(0),
     mimer(0),
-    taosdata(0);
+    taosdata(0),
+
+    vertica(1L << 43);
 
     public final long mask;
     public final long hashCode64;
