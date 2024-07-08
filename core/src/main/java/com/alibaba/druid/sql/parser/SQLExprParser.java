@@ -4551,6 +4551,16 @@ public class SQLExprParser extends SQLParser {
                 && DbType.mysql == dbType) {
             typeName.append(' ').append(lexer.stringVal());
             lexer.nextToken();
+        } else if (typeNameHashCode == FnvHash.Constants.LONG
+                && lexer.identifierEquals(FnvHash.Constants.VARBINARY)
+                && DbType.vertica == dbType) {
+            typeName.append(' ').append(lexer.stringVal());
+            lexer.nextToken();
+        } else if (typeNameHashCode == FnvHash.Constants.LONG
+                && lexer.identifierEquals(FnvHash.Constants.VARCHAR)
+                && DbType.vertica == dbType) {
+            typeName.append(' ').append(lexer.stringVal());
+            lexer.nextToken();
         } else if (typeNameHashCode == FnvHash.Constants.DOUBLE) {
             if (DbType.postgresql == dbType) {
                 typeName.append(' ').append(lexer.stringVal());
