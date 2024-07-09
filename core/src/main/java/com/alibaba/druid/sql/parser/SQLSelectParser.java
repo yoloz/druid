@@ -117,6 +117,8 @@ public class SQLSelectParser extends SQLParser {
         return select;
     }
 
+    protected void afterParseFetchClause(SQLSelectQueryBlock queryBlock) {}
+
     protected SQLUnionQuery createSQLUnionQuery() {
         return new SQLUnionQuery(dbType);
     }
@@ -451,6 +453,13 @@ public class SQLSelectParser extends SQLParser {
             queryBlock.addBeforeComment(lexer.readAndResetComments());
         }
 
+        if (lexer.token() == Token.TABLE && dbType == DbType.spark) {
+            lexer.nextToken();
+            queryBlock.getSelectList().add(new SQLSelectItem(new SQLAllColumnExpr()));
+            queryBlock.setFrom(parseTableSource());
+            return queryRest(queryBlock, acceptUnion);
+        }
+
         accept(Token.SELECT);
 
         querySelectListBefore(queryBlock);
@@ -491,9 +500,8 @@ public class SQLSelectParser extends SQLParser {
 
         parseGroupBy(queryBlock);
 
-        if (lexer.identifierEquals(FnvHash.Constants.WINDOW)) {
-            parseWindow(queryBlock);
-        }
+        qualify(queryBlock);
+        parseWindow(queryBlock);
 
         parseSortBy(queryBlock);
 
@@ -821,6 +829,14 @@ public class SQLSelectParser extends SQLParser {
                 }
             }
         }
+    }
+
+    protected void qualify(SQLSelectQueryBlock queryBlock) {
+        if (!lexer.nextIf(Token.QUALIFY)) {
+            return;
+        }
+        SQLExpr qualify = exprParser.expr();
+        queryBlock.setQualify(qualify);
     }
 
     protected void parseWindow(SQLSelectQueryBlock queryBlock) {
@@ -1979,6 +1995,7 @@ public class SQLSelectParser extends SQLParser {
         if (lexer.token == Token.LIMIT) {
             SQLLimit limit = this.exprParser.parseLimit();
             queryBlock.setLimit(limit);
+            afterParseFetchClause(queryBlock);
             return;
         }
 
@@ -2012,6 +2029,7 @@ public class SQLSelectParser extends SQLParser {
                 acceptIdentifier("ONLY");
             }
         }
+        afterParseFetchClause(queryBlock);
     }
 
     protected void parseHierachical(SQLSelectQueryBlock queryBlock) {
