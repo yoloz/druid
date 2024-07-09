@@ -117,6 +117,8 @@ public class SQLSelectParser extends SQLParser {
         return select;
     }
 
+    protected void afterParseFetchClause(SQLSelectQueryBlock queryBlock) {}
+
     protected SQLUnionQuery createSQLUnionQuery() {
         return new SQLUnionQuery(dbType);
     }
@@ -449,6 +451,13 @@ public class SQLSelectParser extends SQLParser {
 
         if (lexer.hasComment() && lexer.isKeepComments()) {
             queryBlock.addBeforeComment(lexer.readAndResetComments());
+        }
+
+        if (lexer.token() == Token.TABLE && dbType == DbType.spark) {
+            lexer.nextToken();
+            queryBlock.getSelectList().add(new SQLSelectItem(new SQLAllColumnExpr()));
+            queryBlock.setFrom(parseTableSource());
+            return queryRest(queryBlock, acceptUnion);
         }
 
         accept(Token.SELECT);
@@ -1986,6 +1995,7 @@ public class SQLSelectParser extends SQLParser {
         if (lexer.token == Token.LIMIT) {
             SQLLimit limit = this.exprParser.parseLimit();
             queryBlock.setLimit(limit);
+            afterParseFetchClause(queryBlock);
             return;
         }
 
@@ -2019,6 +2029,7 @@ public class SQLSelectParser extends SQLParser {
                 acceptIdentifier("ONLY");
             }
         }
+        afterParseFetchClause(queryBlock);
     }
 
     protected void parseHierachical(SQLSelectQueryBlock queryBlock) {
