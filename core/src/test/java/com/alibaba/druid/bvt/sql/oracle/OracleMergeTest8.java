@@ -17,7 +17,7 @@ package com.alibaba.druid.bvt.sql.oracle;
 
 import java.util.List;
 
-import org.junit.Assert;
+import static org.junit.Assert.*;
 
 import com.alibaba.druid.sql.OracleTest;
 import com.alibaba.druid.sql.SQLUtils;
@@ -41,7 +41,7 @@ public class OracleMergeTest8 extends OracleTest {
         List<SQLStatement> stmtList = parser.parseStatementList();
         SQLMergeStatement mergeStatement = (SQLMergeStatement) stmtList.get(0);
         String result = SQLUtils.toOracleString(mergeStatement);
-        Assert.assertEquals("MERGE INTO (\n" +
+        assertEquals("MERGE INTO (\n" +
                         "\tSELECT *\n" +
                         "\tFROM T09_RULE_CAL_COUNT\n" +
                         "\tWHERE data_dt = '20160328'\n" +
@@ -56,14 +56,15 @@ public class OracleMergeTest8 extends OracleTest {
                         "\t\t(SELECT t2.cust_no, t2.organ_key\n" +
                         "\t\tFROM t08_cust_result_i_mid t2)\n" +
                         "\t)\n" +
-                        ") t3 ON (t3.cust_no = t.cust_no) \n" +
-                        "WHEN MATCHED THEN UPDATE SET t.organ_key = t3.organ_key",
+                        ") t3 ON (t3.cust_no = t.cust_no)\n" +
+                        "WHEN MATCHED THEN UPDATE\n" +
+                        "SET t.organ_key = t3.organ_key",
                 result);
-        // Assert.assertTrue(visitor.getColumns().contains(new TableStat.Column("employees", "employee_id")));
-        // Assert.assertTrue(visitor.getColumns().contains(new TableStat.Column("employees", "salary")));
-        // Assert.assertTrue(visitor.getColumns().contains(new TableStat.Column("employees", "department_id")));
-        // Assert.assertTrue(visitor.getColumns().contains(new TableStat.Column("bonuses", "employee_id")));
-        // Assert.assertTrue(visitor.getColumns().contains(new TableStat.Column("bonuses", "bonus")));
+        // assertTrue(visitor.getColumns().contains(new TableStat.Column("employees", "employee_id")));
+        // assertTrue(visitor.getColumns().contains(new TableStat.Column("employees", "salary")));
+        // assertTrue(visitor.getColumns().contains(new TableStat.Column("employees", "department_id")));
+        // assertTrue(visitor.getColumns().contains(new TableStat.Column("bonuses", "employee_id")));
+        // assertTrue(visitor.getColumns().contains(new TableStat.Column("bonuses", "bonus")));
     }
 
 }

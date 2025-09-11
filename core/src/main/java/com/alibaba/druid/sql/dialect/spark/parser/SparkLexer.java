@@ -7,19 +7,20 @@ package com.alibaba.druid.sql.dialect.spark.parser;
 import com.alibaba.druid.DbType;
 import com.alibaba.druid.sql.dialect.hive.parser.HiveLexer;
 import com.alibaba.druid.sql.parser.Keywords;
+import com.alibaba.druid.sql.parser.SQLParserFeature;
 import com.alibaba.druid.sql.parser.Token;
 
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.alibaba.druid.sql.parser.DialectFeature.ParserFeature.*;
 /**
  * @author peiheng.qph
  * @version $Id: AntsparkLexer.java, v 0.1 2018年09月14日 15:04 peiheng.qph Exp $
  */
 public class SparkLexer extends HiveLexer {
-    public static final Keywords DEFAULT_ANTSPARK_KEYWORDS;
-
-    static {
+    @Override
+    protected Keywords loadKeywords() {
         Map<String, Token> map = new HashMap<String, Token>();
 
         map.putAll(Keywords.DEFAULT_KEYWORDS.getKeywords());
@@ -43,13 +44,33 @@ public class SparkLexer extends HiveLexer {
         map.put("RLIKE", Token.RLIKE);
         map.put("CONSTRAINT", Token.CONSTRAINT);
         map.put("CACHE", Token.CACHE);
+        map.put("QUALIFY", Token.QUALIFY);
+        map.put("OR", Token.OR);
 
-        DEFAULT_ANTSPARK_KEYWORDS = new Keywords(map);
+        return new Keywords(map);
     }
 
     public SparkLexer(String input) {
-        super(input);
-        dbType = DbType.spark;
-        super.keywords = DEFAULT_ANTSPARK_KEYWORDS;
+        this(input, DbType.spark);
+    }
+
+    public SparkLexer(String input, DbType dbType) {
+        super(input, dbType);
+    }
+
+    public SparkLexer(String input, SQLParserFeature... features) {
+        super(input, DbType.spark, features);
+    }
+    public SparkLexer(String input, DbType dbType, SQLParserFeature... features) {
+        super(input, dbType, features);
+    }
+    @Override
+    protected void initDialectFeature() {
+        super.initDialectFeature();
+        this.dialectFeature.configFeature(
+                QueryTable,
+                ParseSelectItemPrefixX,
+                JoinRightTableFrom
+        );
     }
 }

@@ -16,10 +16,13 @@
 package com.alibaba.druid.sql.dialect.presto.visitor;
 
 import com.alibaba.druid.DbType;
+import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.SQLLimit;
 import com.alibaba.druid.sql.ast.expr.SQLArrayExpr;
 import com.alibaba.druid.sql.ast.expr.SQLDecimalExpr;
 import com.alibaba.druid.sql.ast.statement.*;
+import com.alibaba.druid.sql.dialect.presto.ast.PrestoColumnWith;
+import com.alibaba.druid.sql.dialect.presto.ast.PrestoDateTimeExpr;
 import com.alibaba.druid.sql.dialect.presto.ast.stmt.PrestoAlterFunctionStatement;
 import com.alibaba.druid.sql.dialect.presto.ast.stmt.PrestoAlterSchemaStatement;
 import com.alibaba.druid.sql.dialect.presto.ast.stmt.PrestoDeallocatePrepareStatement;
@@ -28,7 +31,6 @@ import com.alibaba.druid.sql.dialect.presto.ast.stmt.PrestoPrepareStatement;
 import com.alibaba.druid.sql.visitor.SQLASTOutputVisitor;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 /**
  * presto 的输出的视图信息
@@ -36,17 +38,21 @@ import java.util.List;
  * @author zhangcanlong
  * @since 2022-01-07
  */
-public class PrestoOutputVisitor extends SQLASTOutputVisitor implements PrestoVisitor {
-    {
-        dbType = DbType.presto;
+public class PrestoOutputVisitor extends SQLASTOutputVisitor implements PrestoASTVisitor {
+    public PrestoOutputVisitor(StringBuilder appender) {
+        this(appender, DbType.presto);
     }
 
-    public PrestoOutputVisitor(StringBuilder appender) {
-        super(appender, DbType.presto);
+    public PrestoOutputVisitor(StringBuilder appender, DbType dbType) {
+        super(appender, dbType);
     }
 
     public PrestoOutputVisitor(StringBuilder appender, boolean parameterized) {
-        super(appender, parameterized);
+        this(appender, DbType.presto, parameterized);
+    }
+
+    public PrestoOutputVisitor(StringBuilder appender, DbType dbType, boolean parameterized) {
+        super(appender, dbType, parameterized);
     }
 
     @Override
@@ -91,24 +97,21 @@ public class PrestoOutputVisitor extends SQLASTOutputVisitor implements PrestoVi
          */
 
         printCreateTable(x, false);
-
-        List<SQLAssignItem> options = x.getTableOptions();
-        if (options.size() > 0) {
-            println();
-            print0(ucase ? "WITH (" : "with (");
-            printAndAccept(options, ", ");
-            print(')');
-        }
-
-        SQLSelect select = x.getSelect();
-        if (select != null) {
-            println();
-            print0(ucase ? "AS" : "as");
-
-            println();
-            visit(select);
-        }
+        printTableOptions(x);
+        printSelectAs(x, true);
         return false;
+    }
+
+    @Override
+    protected void printTableOption(SQLExpr name, SQLExpr value, int index) {
+        if (index != 0) {
+            print(",");
+            println();
+        }
+        String key = name.toString();
+        print0(key);
+        print0(" = ");
+        value.accept(this);
     }
 
     @Override
@@ -183,4 +186,24 @@ public class PrestoOutputVisitor extends SQLASTOutputVisitor implements PrestoVi
         return false;
     }
 
+    @Override
+    public boolean visit(PrestoColumnWith x) {
+        print0(ucase ? "WITH(" : "with(");
+        printAndAccept(x.getProperties(), ",");
+        print0(")");
+        return false;
+    }
+
+    @Override
+    public boolean visit(PrestoDateTimeExpr x) {
+        x.getExpr().accept(this);
+        SQLExpr timeZone = x.getTimeZone();
+        print0(ucase ? " AT TIME ZONE " : " at time zone ");
+        timeZone.accept(this);
+        return false;
+    }
+
+    public void printArrayExprPrefix() {
+        print0(ucase ? "ARRAY" : "array");
+    }
 }

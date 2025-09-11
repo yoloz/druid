@@ -22,7 +22,7 @@ import com.alibaba.druid.sql.dialect.oracle.parser.OracleStatementParser;
 import com.alibaba.druid.sql.dialect.oracle.visitor.OracleSchemaStatVisitor;
 import com.alibaba.druid.stat.TableStat;
 import com.alibaba.druid.util.JdbcConstants;
-import org.junit.Assert;
+import static org.junit.Assert.*;
 
 import java.util.List;
 
@@ -59,10 +59,10 @@ public class OracleCreateTableTest38 extends OracleTest {
                         "\tcust_email VARCHAR2(40)\n" +
                         ")\n" +
                         "PARTITION BY LIST (nls_territory) (\n" +
-                        "\tPARTITION asia VALUES ('CHINA', 'THAILAND'), \n" +
-                        "\tPARTITION europe VALUES ('GERMANY', 'ITALY', 'SWITZERLAND'), \n" +
-                        "\tPARTITION west VALUES ('AMERICA'), \n" +
-                        "\tPARTITION east VALUES ('INDIA'), \n" +
+                        "\tPARTITION asia VALUES ('CHINA', 'THAILAND'),\n" +
+                        "\tPARTITION europe VALUES ('GERMANY', 'ITALY', 'SWITZERLAND'),\n" +
+                        "\tPARTITION west VALUES ('AMERICA'),\n" +
+                        "\tPARTITION east VALUES ('INDIA'),\n" +
                         "\tPARTITION rest VALUES (DEFAULT)\n" +
                         ");",//
                 SQLUtils.toSQLString(stmt, JdbcConstants.ORACLE));
@@ -76,10 +76,10 @@ public class OracleCreateTableTest38 extends OracleTest {
         System.out.println("relationships : " + visitor.getRelationships());
         System.out.println("orderBy : " + visitor.getOrderByColumns());
 
-        Assert.assertEquals(1, visitor.getTables().size());
+        assertEquals(1, visitor.getTables().size());
 
-        Assert.assertEquals(6, visitor.getColumns().size());
+        assertEquals(6, visitor.getColumns().size());
 
-        Assert.assertTrue(visitor.getColumns().contains(new TableStat.Column("list_customers", "customer_id")));
+        assertTrue(visitor.getColumns().contains(new TableStat.Column("list_customers", "customer_id")));
     }
 }

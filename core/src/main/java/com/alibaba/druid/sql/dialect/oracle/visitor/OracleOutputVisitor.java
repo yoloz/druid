@@ -20,8 +20,10 @@ import com.alibaba.druid.sql.ast.*;
 import com.alibaba.druid.sql.ast.expr.*;
 import com.alibaba.druid.sql.ast.statement.*;
 import com.alibaba.druid.sql.ast.statement.SQLJoinTableSource.JoinType;
+import com.alibaba.druid.sql.dialect.mysql.ast.statement.MySqlCreateTableStatement;
 import com.alibaba.druid.sql.dialect.oracle.ast.OracleDataTypeIntervalDay;
 import com.alibaba.druid.sql.dialect.oracle.ast.OracleDataTypeIntervalYear;
+import com.alibaba.druid.sql.dialect.oracle.ast.OraclePartitionSingle;
 import com.alibaba.druid.sql.dialect.oracle.ast.clause.*;
 import com.alibaba.druid.sql.dialect.oracle.ast.clause.ModelClause.*;
 import com.alibaba.druid.sql.dialect.oracle.ast.expr.*;
@@ -52,7 +54,7 @@ public class OracleOutputVisitor extends SQLASTOutputVisitor implements OracleAS
     }
 
     public OracleOutputVisitor(StringBuilder appender, boolean printPostSemi) {
-        super(appender);
+        super(appender, DbType.oracle);
         this.printPostSemi = printPostSemi;
     }
 
@@ -401,8 +403,8 @@ public class OracleOutputVisitor extends SQLASTOutputVisitor implements OracleAS
     protected void printFrom(SQLSelectQueryBlock x) {
         println();
         print0(ucase ? "FROM " : "from ");
-        if (x.getCommentsAfaterFrom() != null) {
-            printAfterComments(x.getCommentsAfaterFrom());
+        if (x.getCommentsAfterFrom() != null) {
+            printAfterComments(x.getCommentsAfterFrom());
             println();
         }
         SQLTableSource from = x.getFrom();
@@ -1107,50 +1109,6 @@ public class OracleOutputVisitor extends SQLASTOutputVisitor implements OracleAS
     }
 
     @Override
-    public boolean visit(OracleExceptionStatement.Item x) {
-        print0(ucase ? "WHEN " : "when ");
-        x.getWhen().accept(this);
-        print0(ucase ? " THEN" : " then");
-
-        this.indentCount++;
-        if (x.getStatements().size() > 1) {
-            println();
-        } else {
-            if (x.getStatements().size() == 1
-                    && x.getStatements().get(0) instanceof SQLIfStatement) {
-                println();
-            } else {
-                print(' ');
-            }
-        }
-
-        for (int i = 0, size = x.getStatements().size(); i < size; ++i) {
-            if (i != 0 && size > 1) {
-                println();
-            }
-            SQLStatement stmt = x.getStatements().get(i);
-            stmt.accept(this);
-        }
-
-        this.indentCount--;
-        return false;
-    }
-
-    @Override
-    public boolean visit(OracleExceptionStatement x) {
-        print0(ucase ? "EXCEPTION" : "exception");
-        this.indentCount++;
-        List<OracleExceptionStatement.Item> items = x.getItems();
-        for (int i = 0, size = items.size(); i < size; ++i) {
-            println();
-            OracleExceptionStatement.Item item = items.get(i);
-            item.accept(this);
-        }
-        this.indentCount--;
-        return false;
-    }
-
-    @Override
     public boolean visit(OracleArgumentExpr x) {
         print0(x.getArgumentName());
         print0(" => ");
@@ -1725,11 +1683,7 @@ public class OracleOutputVisitor extends SQLASTOutputVisitor implements OracleAS
             print0(ucase ? "MONITORING" : "monitoring");
         }
 
-        if (x.getPartitioning() != null) {
-            println();
-            print0(ucase ? "PARTITION BY " : "partition by ");
-            x.getPartitioning().accept(this);
-        }
+        printPartitionBy(x);
 
         if (x.getCluster() != null) {
             println();
@@ -2957,6 +2911,88 @@ public class OracleOutputVisitor extends SQLASTOutputVisitor implements OracleAS
     @Override
     public boolean visit(OracleCreateTableSpaceStatement x) {
         print0(ucase ? x.getSql().toUpperCase() : x.getSql().toLowerCase());
+        return false;
+    }
+
+    @Override
+    public boolean visit(SQLPartitionSingle x) {
+        if (x instanceof OraclePartitionSingle) {
+            return visit((OraclePartitionSingle) x);
+        }
+        return super.visit(x);
+    }
+
+    public boolean visit(OraclePartitionSingle x) {
+        boolean isDbPartiton = false, isTbPartition = false;
+        final SQLObject parent = x.getParent();
+        if (parent != null) {
+            final SQLObject parent2 = parent.getParent();
+            if (parent2 instanceof MySqlCreateTableStatement) {
+                MySqlCreateTableStatement stmt = (MySqlCreateTableStatement) parent2;
+                isDbPartiton = parent == stmt.getDbPartitionBy();
+                isTbPartition = parent == stmt.getTablePartitionBy();
+            }
+        }
+
+        if (isDbPartiton) {
+            print0(ucase ? "DBPARTITION " : "dbpartition ");
+        } else if (isTbPartition) {
+            print0(ucase ? "TBPARTITION " : "tbpartition ");
+        } else {
+            print0(ucase ? "PARTITION " : "partition ");
+        }
+        x.getName().accept(this);
+        if (x.getValues() != null) {
+            print(' ');
+            x.getValues().accept(this);
+        }
+
+        this.indentCount++;
+        printOracleSegmentAttributes(x);
+        this.indentCount--;
+        if (x.getSubPartitionsCount() != null) {
+            this.indentCount++;
+            println();
+            print0(ucase ? "SUBPARTITIONS " : "subpartitions ");
+            x.getSubPartitionsCount().accept(this);
+            this.indentCount--;
+        }
+
+        if (x.getSubPartitions().size() > 0) {
+            print(" (");
+            this.indentCount++;
+            for (int i = 0; i < x.getSubPartitions().size(); ++i) {
+                if (i != 0) {
+                    print(',');
+                }
+                println();
+                x.getSubPartitions().get(i).accept(this);
+            }
+            this.indentCount--;
+            println();
+            print(')');
+        }
+
+        SQLExpr locality = x.getLocality();
+        if (locality != null) {
+            print(ucase ? " LOCALITY = " : " locality = ");
+            locality.accept(this);
+        }
+
+        return false;
+    }
+
+    @Override
+    public boolean visit(SQLMergeStatement.WhenDelete x) {
+        print0(ucase ? "DELETE" : "delete");
+        if (x.isNot()) {
+            print0(ucase ? " NOT MATCHED" : " not matched");
+        }
+        SQLExpr where = x.getWhere();
+        if (where != null) {
+            print0(ucase ? " WHERE " : " where");
+            printExpr(where, parameterized);
+        }
         return false;
     }
 }

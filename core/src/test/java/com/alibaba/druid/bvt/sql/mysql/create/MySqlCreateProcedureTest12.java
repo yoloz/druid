@@ -21,7 +21,7 @@ import com.alibaba.druid.sql.ast.SQLStatement;
 import com.alibaba.druid.sql.visitor.SchemaStatVisitor;
 import com.alibaba.druid.stat.TableStat;
 import com.alibaba.druid.util.JdbcConstants;
-import org.junit.Assert;
+import static org.junit.Assert.*;
 
 import java.util.List;
 
@@ -71,13 +71,14 @@ public class MySqlCreateProcedureTest12 extends MysqlTest {
 //        System.out.println("orderBy : " + visitor.getOrderByColumns());
 
         assertEquals(3, visitor.getTables().size());
-        assertEquals(4, visitor.getColumns().size());
+        assertEquals(5, visitor.getColumns().size());
         assertEquals(2, visitor.getConditions().size());
 
-        Assert.assertTrue(visitor.containsColumn("_result", "node"));
-        Assert.assertTrue(visitor.containsColumn("nodes", "parent"));
-        Assert.assertTrue(visitor.containsColumn("nodes", "child"));
-        Assert.assertTrue(visitor.containsColumn("_tmp", "node"));
+        assertTrue(visitor.containsColumn("_result", "*"));
+        assertTrue(visitor.containsColumn("_result", "node"));
+        assertTrue(visitor.containsColumn("nodes", "parent"));
+        assertTrue(visitor.containsColumn("nodes", "child"));
+        assertTrue(visitor.containsColumn("_tmp", "node"));
     }
 
 }
