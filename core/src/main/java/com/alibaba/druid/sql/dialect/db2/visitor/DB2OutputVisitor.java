@@ -18,14 +18,11 @@ package com.alibaba.druid.sql.dialect.db2.visitor;
 import com.alibaba.druid.DbType;
 import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.SQLName;
-import com.alibaba.druid.sql.ast.SQLPartitionBy;
 import com.alibaba.druid.sql.ast.expr.*;
 import com.alibaba.druid.sql.ast.statement.SQLAlterTableAddColumn;
 import com.alibaba.druid.sql.ast.statement.SQLColumnDefinition;
 import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
-import com.alibaba.druid.sql.dialect.db2.ast.stmt.DB2CreateTableStatement;
-import com.alibaba.druid.sql.dialect.db2.ast.stmt.DB2SelectQueryBlock;
-import com.alibaba.druid.sql.dialect.db2.ast.stmt.DB2ValuesStatement;
+import com.alibaba.druid.sql.dialect.db2.ast.stmt.*;
 import com.alibaba.druid.sql.visitor.SQLASTOutputVisitor;
 
 public class DB2OutputVisitor extends SQLASTOutputVisitor implements DB2ASTVisitor {
@@ -34,8 +31,7 @@ public class DB2OutputVisitor extends SQLASTOutputVisitor implements DB2ASTVisit
     }
 
     public DB2OutputVisitor(StringBuilder appender, boolean parameterized) {
-        super(appender, parameterized);
-        this.dbType = DbType.db2;
+        super(appender, DbType.db2, parameterized);
     }
 
     @Override
@@ -121,12 +117,7 @@ public class DB2OutputVisitor extends SQLASTOutputVisitor implements DB2ASTVisit
             validproc.accept(this);
         }
 
-        SQLPartitionBy partitionBy = x.getPartitioning();
-        if (partitionBy != null) {
-            println();
-            print0(ucase ? "PARTITION BY " : "partition by ");
-            partitionBy.accept(this);
-        }
+        printPartitionBy(x);
 
         Boolean compress = x.getCompress();
         if (compress != null) {
@@ -143,6 +134,46 @@ public class DB2OutputVisitor extends SQLASTOutputVisitor implements DB2ASTVisit
 
     @Override
     public void endVisit(DB2CreateTableStatement x) {
+    }
+
+    @Override
+    public boolean visit(DB2CreateSchemaStatement x) {
+        printUcase("CREATE SCHEMA ");
+        if (x.getSchemaName() != null) {
+            x.getSchemaName().accept(this);
+        }
+
+        return false;
+    }
+
+    @Override
+    public void endVisit(DB2CreateSchemaStatement x) {
+    }
+
+    @Override
+    public boolean visit(DB2DropSchemaStatement x) {
+        printUcase("DROP SCHEMA ");
+
+        if (x.isIfExists()) {
+            printUcase("IF EXISTS ");
+        }
+
+        if (x.getSchemaName() != null) {
+            x.getSchemaName().accept(this);
+        }
+
+        if (x.isCascade()) {
+            print0(ucase ? " CASCADE" : " cascade");
+        }
+        if (x.isRestrict()) {
+            print0(ucase ? " RESTRICT" : " restrict");
+        }
+
+        return false;
+    }
+
+    @Override
+    public void endVisit(DB2DropSchemaStatement x) {
     }
 
     protected void printOperator(SQLBinaryOperator operator) {

@@ -21,6 +21,7 @@ import com.alibaba.druid.sql.ast.SQLName;
 import com.alibaba.druid.sql.ast.SQLStatement;
 import com.alibaba.druid.sql.ast.expr.SQLIdentifierExpr;
 import com.alibaba.druid.sql.ast.expr.SQLPropertyExpr;
+import com.alibaba.druid.sql.ast.statement.SQLExplainStatement;
 import com.alibaba.druid.sql.ast.statement.SQLExprTableSource;
 import com.alibaba.druid.sql.ast.statement.SQLInsertInto;
 import com.alibaba.druid.sql.ast.statement.SQLSelect;
@@ -46,6 +47,7 @@ import com.alibaba.druid.sql.dialect.presto.ast.stmt.PrestoPrepareStatement;
 import com.alibaba.druid.sql.parser.Lexer;
 import com.alibaba.druid.sql.parser.ParserException;
 import com.alibaba.druid.sql.parser.SQLCreateTableParser;
+import com.alibaba.druid.sql.parser.SQLExprParser;
 import com.alibaba.druid.sql.parser.SQLParserFeature;
 import com.alibaba.druid.sql.parser.SQLSelectParser;
 import com.alibaba.druid.sql.parser.SQLStatementParser;
@@ -65,10 +67,13 @@ public class PrestoStatementParser extends SQLStatementParser {
     public PrestoStatementParser(String sql) {
         super(new PrestoExprParser(sql));
     }
- public PrestoStatementParser(String sql, SQLParserFeature... features) {
+    public PrestoStatementParser(String sql, SQLParserFeature... features) {
         super(new PrestoExprParser(sql, features));
     }
 
+    public PrestoStatementParser(SQLExprParser exprParser) {
+        super(exprParser);
+    }
     public PrestoStatementParser(Lexer lexer) {
         super(new PrestoExprParser(lexer));
     }
@@ -510,5 +515,31 @@ public class PrestoStatementParser extends SQLStatementParser {
         stmt.setStatementName(statementName);
 
         return stmt;
+    }
+
+    @Override
+    public void parseCreateTableSupportSchema() {
+        if (lexer.token() == Token.SCHEMA) {
+            lexer.nextToken();
+        } else {
+            accept(Token.DATABASE);
+        }
+    }
+
+    @Override
+    public void parseExplainFormatType(SQLExplainStatement explain) {
+        if (lexer.token() == Token.LPAREN) {
+            lexer.nextToken();
+
+            if (lexer.identifierEquals("FORMAT")) {
+                lexer.nextToken();
+                lexer.nextToken();
+            } else if (lexer.identifierEquals("TYPE")) {
+                lexer.nextToken();
+                lexer.nextToken();
+            }
+
+            accept(Token.RPAREN);
+        }
     }
 }

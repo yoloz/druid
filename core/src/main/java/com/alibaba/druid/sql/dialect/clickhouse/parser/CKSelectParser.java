@@ -3,11 +3,19 @@ package com.alibaba.druid.sql.dialect.clickhouse.parser;
 import com.alibaba.druid.sql.ast.SQLExpr;
 import com.alibaba.druid.sql.ast.expr.SQLIdentifierExpr;
 import com.alibaba.druid.sql.ast.statement.SQLAssignItem;
+import com.alibaba.druid.sql.ast.statement.SQLSelectGroupByClause;
 import com.alibaba.druid.sql.ast.statement.SQLSelectQueryBlock;
+import com.alibaba.druid.sql.ast.statement.SQLTableSource;
 import com.alibaba.druid.sql.ast.statement.SQLWithSubqueryClause;
 import com.alibaba.druid.sql.dialect.clickhouse.ast.CKSelectQueryBlock;
-import com.alibaba.druid.sql.parser.*;
+import com.alibaba.druid.sql.parser.Lexer;
+import com.alibaba.druid.sql.parser.SQLExprParser;
+import com.alibaba.druid.sql.parser.SQLSelectListCache;
+import com.alibaba.druid.sql.parser.SQLSelectParser;
+import com.alibaba.druid.sql.parser.Token;
 import com.alibaba.druid.util.FnvHash;
+
+import java.util.List;
 
 public class CKSelectParser
         extends SQLSelectParser {
@@ -19,6 +27,7 @@ public class CKSelectParser
         super(exprParser, selectListCache);
     }
 
+    @Override
     public SQLWithSubqueryClause parseWith() {
         SQLWithSubqueryClause withQueryClause = new SQLWithSubqueryClause();
         if (lexer.hasComment() && lexer.isKeepComments()) {
@@ -67,10 +76,12 @@ public class CKSelectParser
         return withQueryClause;
     }
 
+    @Override
     protected SQLSelectQueryBlock createSelectQueryBlock() {
         return new CKSelectQueryBlock();
     }
 
+    @Override
     public void parseWhere(SQLSelectQueryBlock queryBlock) {
         if (lexer.nextIf(Token.PREWHERE)) {
             SQLExpr preWhere = exprParser.expr();
@@ -80,10 +91,38 @@ public class CKSelectParser
     }
 
     @Override
+    public void parseFrom(SQLSelectQueryBlock queryBlock) {
+        List<String> comments = null;
+        if (lexer.hasComment() && lexer.isKeepComments()) {
+            comments = lexer.readAndResetComments();
+        }
+
+        if (lexer.nextIf(Token.FROM)) {
+            SQLTableSource from = parseTableSource();
+
+            if (comments != null) {
+                from.addBeforeComment(comments);
+            }
+
+            queryBlock.setFrom(from);
+        } else {
+            if (comments != null) {
+                queryBlock.addAfterComment(comments);
+            }
+        }
+
+        if (lexer.nextIf(Token.FINAL)) {
+            if (queryBlock instanceof CKSelectQueryBlock) {
+                ((CKSelectQueryBlock) queryBlock).setFinal(true);
+            }
+        }
+    }
+
+    @Override
     protected void afterParseFetchClause(SQLSelectQueryBlock queryBlock) {
         if (queryBlock instanceof CKSelectQueryBlock) {
             CKSelectQueryBlock ckSelectQueryBlock = (CKSelectQueryBlock) queryBlock;
-            if (lexer.identifierEquals("SETTINGS")) {
+            if (lexer.token() == Token.SETTINGS) {
                 lexer.nextToken();
                 for (; ; ) {
                     SQLAssignItem item = this.exprParser.parseAssignItem();
@@ -95,7 +134,50 @@ public class CKSelectParser
                     break;
                 }
             }
+
+            if (lexer.token() == Token.FORMAT) {
+                lexer.nextToken();
+                ckSelectQueryBlock.setFormat(expr());
+            }
         }
     }
 
+    @Override
+    protected void afterParseLimitClause(SQLSelectQueryBlock queryBlock) {
+        if (queryBlock instanceof CKSelectQueryBlock) {
+            if (lexer.token() == Token.WITH) {
+                lexer.nextToken();
+                acceptIdentifier("TIES");
+                ((CKSelectQueryBlock) queryBlock).setWithTies(true);
+            }
+        }
+    }
+
+    @Override
+    protected void parseOrderByWith(SQLSelectGroupByClause groupBy, SQLSelectQueryBlock queryBlock) {
+        Lexer.SavePoint mark = lexer.mark();
+        lexer.nextToken();
+
+        if (lexer.identifierEquals(FnvHash.Constants.CUBE)) {
+            lexer.nextToken();
+            groupBy.setWithCube(true);
+        } else if (lexer.identifierEquals(FnvHash.Constants.ROLLUP)) {
+            lexer.nextToken();
+            groupBy.setWithRollUp(true);
+        } else if (lexer.identifierEquals("TOTALS")) {
+            lexer.nextToken();
+            ((CKSelectQueryBlock) queryBlock).setWithTotals(true);
+        } else {
+            lexer.reset(mark);
+        }
+    }
+
+    @Override
+    protected void parseAfterOrderBy(SQLSelectQueryBlock queryBlock) {
+        if (lexer.token() == Token.WITH) {
+            lexer.nextToken();
+            acceptIdentifier("FILL");
+            ((CKSelectQueryBlock) queryBlock).setWithFill(true);
+        }
+    }
 }
