@@ -4318,6 +4318,11 @@ public class SQLExprParser extends SQLParser {
         if (typeNameHashCode == FnvHash.Constants.LONG
                 && lexer.identifierEquals(FnvHash.Constants.BYTE)) {
             parseDataTypeByte(typeName);
+        } else if (typeNameHashCode == FnvHash.Constants.LONG
+                && lexer.identifierEquals(FnvHash.Constants.VARBINARY)) {
+            // for vertica
+            typeName.append(' ').append(lexer.stringVal());
+            lexer.nextToken();
         } else if (typeNameHashCode == FnvHash.Constants.DOUBLE) {
             parseDataTypeDouble(typeName);
             parseDataTypePrecision(typeName);
