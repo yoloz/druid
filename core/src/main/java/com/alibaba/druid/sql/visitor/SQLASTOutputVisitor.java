@@ -108,6 +108,7 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
     protected boolean endLineComment;
 
     protected SQLDialect dialect;
+    protected final SQLASTOutputVisitorBinaryOpSupport binaryOpSupport = new SQLASTOutputVisitorBinaryOpSupport(this);
 
     protected Boolean printStatementAfterSemi = defaultPrintStatementAfterSemi;
 
@@ -120,19 +121,29 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
     }
 
     public SQLASTOutputVisitor(StringBuilder appender, DbType dbType) {
+        this(appender, dbType, SQLDialect.of(dbType));
+    }
+
+    public SQLASTOutputVisitor(StringBuilder appender, DbType dbType, SQLDialect dialect) {
         this.appender = appender;
         this.dbType = dbType;
-        this.dialect = SQLDialect.of(dbType);
+        this.dialect = dialect;
     }
 
     public SQLASTOutputVisitor(StringBuilder appender, boolean parameterized) {
         this.appender = appender;
+        this.dialect = SQLDialect.of(dbType);
         this.config(VisitorFeature.OutputParameterized, parameterized);
     }
+
     public SQLASTOutputVisitor(StringBuilder appender, DbType dbType, boolean parameterized) {
+        this(appender, dbType, SQLDialect.of(dbType), parameterized);
+    }
+
+    public SQLASTOutputVisitor(StringBuilder appender, DbType dbType, SQLDialect dialect, boolean parameterized) {
         this.appender = appender;
         this.dbType = dbType;
-        this.dialect = SQLDialect.of(dbType);
+        this.dialect = dialect;
         this.config(VisitorFeature.OutputParameterized, parameterized);
     }
 
@@ -657,229 +668,15 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
     // ////////////////////
 
     public boolean visit(SQLBetweenExpr x) {
-        final SQLExpr testExpr = x.getTestExpr();
-        final SQLExpr beginExpr = x.getBeginExpr();
-        final SQLExpr endExpr = x.getEndExpr();
-        if (x.isParenthesized()) {
-            print('(');
-        }
-        if (testExpr != null) {
-            printExpr(testExpr, parameterized);
-        }
-
-        if (x.isNot()) {
-            print0(ucase ? " NOT BETWEEN " : " not between ");
-        } else {
-            print0(ucase ? " BETWEEN " : " between ");
-        }
-
-        int lines = this.lines;
-        if (beginExpr instanceof SQLBinaryOpExpr) {
-            SQLBinaryOpExpr binaryOpBegin = (SQLBinaryOpExpr) beginExpr;
-            incrementIndent();
-            printExpr(beginExpr, parameterized);
-            decrementIndent();
-        } else {
-            printExpr(beginExpr, parameterized);
-        }
-
-        if (lines != this.lines) {
-            println();
-            print0(ucase ? "AND " : "and ");
-        } else {
-            print0(ucase ? " AND " : " and ");
-        }
-
-        if (endExpr instanceof SQLBinaryOpExpr) {
-            SQLBinaryOpExpr binaryOpEnd = (SQLBinaryOpExpr) endExpr;
-            incrementIndent();
-            printExpr(endExpr, parameterized);
-            decrementIndent();
-        } else {
-            printExpr(endExpr, parameterized);
-        }
-
-        if (x.getHint() != null) {
-            x.getHint().accept(this);
-        }
-        if (x.isParenthesized()) {
-            print(')');
-        }
-        return false;
+        return binaryOpSupport.visitBetweenExpr(x);
     }
 
     public boolean visit(SQLBinaryOpExprGroup x) {
-        SQLObject parent = x.getParent();
-        SQLBinaryOperator operator = x.getOperator();
-
-        boolean isRoot = parent instanceof SQLSelectQueryBlock || parent instanceof SQLBinaryOpExprGroup;
-
-        List<SQLExpr> items = x.getItems();
-        if (items.isEmpty()) {
-            print("true");
-            return false;
-        }
-
-        if (isRoot) {
-            this.indentCount++;
-        }
-
-        if (this.parameterized) {
-            SQLExpr firstLeft = null;
-            SQLBinaryOperator firstOp = null;
-            List<Object> parameters = new ArrayList<Object>(items.size());
-
-            List<SQLBinaryOpExpr> literalItems = null;
-
-            if ((operator != SQLBinaryOperator.BooleanOr || !isEnabled(VisitorFeature.OutputParameterizedQuesUnMergeOr)) &&
-                    (operator != SQLBinaryOperator.BooleanAnd || !isEnabled(VisitorFeature.OutputParameterizedQuesUnMergeAnd))) {
-                for (int i = 0; i < items.size(); i++) {
-                    SQLExpr item = items.get(i);
-                    if (item instanceof SQLBinaryOpExpr) {
-                        SQLBinaryOpExpr binaryItem = (SQLBinaryOpExpr) item;
-                        SQLExpr left = binaryItem.getLeft();
-                        SQLExpr right = binaryItem.getRight();
-
-                        if (right instanceof SQLLiteralExpr && !(right instanceof SQLNullExpr)) {
-                            if (left instanceof SQLLiteralExpr) {
-                                if (literalItems == null) {
-                                    literalItems = new ArrayList<SQLBinaryOpExpr>();
-                                }
-                                literalItems.add(binaryItem);
-                                continue;
-                            }
-
-                            if (this.parameters != null) {
-                                ExportParameterVisitorUtils.exportParameter(parameters, right);
-                            }
-                        } else if (right instanceof SQLVariantRefExpr) {
-                            // skip
-                        } else {
-                            firstLeft = null;
-                            break;
-                        }
-
-                        if (firstLeft == null) {
-                            firstLeft = binaryItem.getLeft();
-                            firstOp = binaryItem.getOperator();
-                        } else {
-                            if (firstOp != binaryItem.getOperator() || !SQLExprUtils.equals(firstLeft, left)) {
-                                firstLeft = null;
-                                break;
-                            }
-                        }
-                    } else {
-                        firstLeft = null;
-                        break;
-                    }
-                }
-            }
-
-            if (firstLeft != null) {
-                if (literalItems != null) {
-                    for (SQLBinaryOpExpr literalItem : literalItems) {
-                        visit(literalItem);
-                        println();
-                        printOperator(operator);
-                        print(' ');
-
-                    }
-                }
-                printExpr(firstLeft, parameterized);
-                print(' ');
-                printOperator(firstOp);
-                print0(" ?");
-
-                if (this.parameters != null) {
-                    if (parameters.size() > 0) {
-                        this.parameters.addAll(parameters);
-                    }
-                }
-
-                incrementReplaceCunt();
-                if (isRoot) {
-                    this.indentCount--;
-                }
-                return false;
-            }
-        }
-
-        for (int i = 0; i < items.size(); i++) {
-            SQLExpr item = items.get(i);
-
-            if (i != 0) {
-                println();
-                printOperator(operator);
-                print(' ');
-            }
-
-            if (item.hasBeforeComment()) {
-                printlnComments(item.getBeforeCommentsDirect());
-            }
-
-            if (item instanceof SQLBinaryOpExpr) {
-                SQLBinaryOpExpr binaryOpExpr = (SQLBinaryOpExpr) item;
-                SQLExpr binaryOpExprRight = binaryOpExpr.getRight();
-                SQLBinaryOperator itemOp = binaryOpExpr.getOperator();
-
-                boolean isLogic = itemOp.isLogical();
-                if (isLogic) {
-                    indentCount++;
-                }
-
-                boolean bracket = false;
-                if (itemOp.priority > operator.priority) {
-                    bracket = true;
-                } else {
-                    //bracket = !parameterized && !((SQLBinaryOpExpr) item).isParenthesized();
-                }
-                visit(binaryOpExpr);
-//
-//                if (item.hasAfterComment() && !parameterized) {
-//                    print(' ');
-//                    printlnComment(item.getAfterCommentsDirect());
-//                }
-
-                if (isLogic) {
-                    indentCount--;
-                }
-            } else if (item instanceof SQLBinaryOpExprGroup) {
-                print('(');
-                visit((SQLBinaryOpExprGroup) item);
-                print(')');
-            } else {
-                printExpr(item, parameterized);
-            }
-        }
-        List<String> afterComments = x.getAfterCommentsDirect();
-        if (!parameterized) {
-            if (afterComments != null && !afterComments.isEmpty() && isPrettyFormat()) {
-                print(' ');
-            }
-            printlnComment(afterComments);
-        }
-        if (isRoot) {
-            this.indentCount--;
-        }
-        return false;
+        return binaryOpSupport.visitBinaryOpExprGroup(x);
     }
 
     public boolean visit(SQLBinaryOpExpr x) {
-        if (x.isParenthesized()) {
-            print('(');
-        }
-        boolean rs = visitInternal(x);
-        if (x.isParenthesized()) {
-            print(')');
-        }
-        List<String> afterComments = x.getAfterCommentsDirect();
-        if (!parameterized) {
-            if (afterComments != null && !afterComments.isEmpty() && isPrettyFormat()) {
-                print(' ');
-            }
-            printlnComment(afterComments);
-        }
-        return rs;
+        return binaryOpSupport.visitBinaryOpExpr(x);
     }
 
     public boolean visit(SQLTypeExpr x) {
@@ -1043,7 +840,7 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
 
             boolean printOpSpace = true;
             if (relational) {
-                if (dbType == DbType.hive && x.getParent() instanceof SQLMethodInvokeExpr) {
+                if ((DbType.hive == dbType || DbType.spark == dbType) && x.getParent() instanceof SQLMethodInvokeExpr) {
                     print(' ');
                 } else {
                     println();
@@ -2655,6 +2452,14 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
                     print(' ' + orderingExpr.getType().name);
                 } else {
                     item.accept(this);
+                    if (i != itemSize - 1 && item.hasAfterComment()) {
+                        // 如果下一项是 SQLGroupingSetExpr，则不打印换行，因为后续会自动打印
+                        if (i + 1 < itemSize && items.get(i + 1) instanceof SQLGroupingSetExpr) {
+                            // 不打印换行，避免出现空行
+                        } else {
+                            println();
+                        }
+                    }
                 }
 
                 SQLCommentHint hint = null;
@@ -5281,7 +5086,7 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
     public boolean visit(SQLAlterTableAddColumn x) {
         print0(ucase ? "ADD" : "add");
 
-        if (DbType.odps == dbType || DbType.hive == dbType) {
+        if (DbType.odps == dbType || DbType.hive == dbType || DbType.spark == dbType) {
             print0(ucase ? " COLUMNS" : " columns");
         }
 
@@ -5512,7 +5317,7 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
                     || dbType == DbType.mariadb) {
                 println();
                 print0(ucase ? "WITH (" : "with (");
-            } else if (dbType == DbType.hive || dbType == DbType.presto || dbType == DbType.trino || dbType == DbType.supersql) {
+            } else if (dbType == DbType.hive || dbType == DbType.presto || dbType == DbType.trino || dbType == DbType.supersql || dbType == DbType.spark) {
                 println();
                 print0(ucase ? "WITH DBPROPERTIES (" : "with dbproperties (");
             } else {
@@ -6103,7 +5908,7 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
     public boolean visit(SQLAlterTableAlterColumn x) {
         if (DbType.odps == dbType) {
             print0(ucase ? "CHANGE COLUMN" : "change column");
-        } else if (DbType.hive == dbType) {
+        } else if (DbType.hive == dbType || DbType.spark == dbType) {
             print0(ucase ? "CHANGE" : "change");
         } else {
             print0(ucase ? "ALTER COLUMN" : "alter column");
@@ -6324,7 +6129,7 @@ public class SQLASTOutputVisitor extends SQLASTVisitorAdapter implements Paramet
             SQLAlterTableItem item = x.getItems().get(i);
             if (i != 0) {
                 SQLAlterTableItem former = x.getItems().get(i - 1);
-                if ((this.dbType == DbType.hive || this.dbType == DbType.odps)
+                if ((this.dbType == DbType.hive || this.dbType == DbType.odps || this.dbType == DbType.spark)
                         && former instanceof SQLAlterTableAddPartition
                         && item instanceof SQLAlterTableAddPartition) {
                     // ignore comma

@@ -3,8 +3,10 @@ package com.alibaba.druid.sql.dialect.clickhouse.visitor;
 import com.alibaba.druid.DbType;
 import com.alibaba.druid.sql.ast.*;
 import com.alibaba.druid.sql.ast.statement.*;
+import com.alibaba.druid.sql.dialect.clickhouse.CK;
 import com.alibaba.druid.sql.dialect.clickhouse.ast.CKAlterTableUpdateStatement;
 import com.alibaba.druid.sql.dialect.clickhouse.ast.CKCreateTableStatement;
+import com.alibaba.druid.sql.dialect.clickhouse.ast.CKDropTableStatement;
 import com.alibaba.druid.sql.dialect.clickhouse.ast.CKSelectQueryBlock;
 import com.alibaba.druid.sql.dialect.clickhouse.ast.ClickhouseColumnCodec;
 import com.alibaba.druid.sql.dialect.clickhouse.ast.ClickhouseColumnTTL;
@@ -17,7 +19,7 @@ import java.util.List;
 
 public class CKOutputVisitor extends SQLASTOutputVisitor implements CKASTVisitor {
     public CKOutputVisitor(StringBuilder appender) {
-        super(appender, DbType.clickhouse);
+        super(appender, DbType.clickhouse, CK.DIALECT);
     }
 
     public CKOutputVisitor(StringBuilder appender, DbType dbType) {
@@ -25,7 +27,7 @@ public class CKOutputVisitor extends SQLASTOutputVisitor implements CKASTVisitor
     }
 
     public CKOutputVisitor(StringBuilder appender, boolean parameterized) {
-        super(appender, DbType.clickhouse, parameterized);
+        super(appender, DbType.clickhouse, CK.DIALECT, parameterized);
     }
 
     @Override
@@ -410,6 +412,25 @@ public class CKOutputVisitor extends SQLASTOutputVisitor implements CKASTVisitor
         print0(ucase ? "ARRAY(" : "array(");
         x.getComponentType().accept(this);
         print(')');
+        return false;
+    }
+
+    @Override
+    public boolean visit(CKDropTableStatement x) {
+        print0(ucase ? "DROP TABLE " : "drop table ");
+
+        if (x.isIfExists()) {
+            print0(ucase ? "IF EXISTS " : "if exists ");
+        }
+
+        printAndAccept(x.getTableSources(), ", ");
+
+        // 输出 ON CLUSTER
+        if (x.getOnClusterName() != null && !x.getOnClusterName().isEmpty()) {
+            print0(ucase ? " ON CLUSTER " : " on cluster ");
+            print0(x.getOnClusterName());
+        }
+
         return false;
     }
 }
