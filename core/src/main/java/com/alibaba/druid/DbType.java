@@ -118,7 +118,8 @@ public enum DbType {
     mimer(0),
     taosdata(0),
     sundb(0),
-    vertica(0);
+    vertica(0),
+    mongodb(0);
 
     public final long mask;
     public final long hashCode64;

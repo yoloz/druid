@@ -18,7 +18,6 @@ package com.alibaba.druid.wall;
 import com.alibaba.druid.sql.SQLUtils;
 import com.alibaba.druid.wall.spi.WallVisitorUtils;
 
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -295,7 +294,7 @@ public class WallConfig implements WallConfigMBean {
     }
 
     public void loadConfig(String dir) {
-        if (dir == null || !Paths.get(dir).toFile().exists()) {
+        if (dir == null) {
             return;
         }
         if (dir.endsWith("/")) {
